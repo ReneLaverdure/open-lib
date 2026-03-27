@@ -1,7 +1,68 @@
+import { useEffect } from "react";
 import logoDark from "./logo-dark.svg";
 import logoLight from "./logo-light.svg";
+import Alite from "~/util/alite";
 
 export function Welcome() {
+  const alite = new Alite({
+    baseUrl: "https://jsonplaceholder.typicode.com/posts/1",
+  });
+  // alite.addRequestInterceptor((options) => {
+  //   options.url = "https://jsonplaceholder.typicode.com/users";
+  //   return options;
+  // });
+  // alite.addRequestInterceptor((options) => {
+  //   console.log(options);
+  //   console.log(options.headers);
+  //   options.headers["Content-Type"] = "application/json";
+  //   return options;
+  // });
+  //
+  // alite.addRequestInterceptor((options) => {
+  //   console.log(`[request] ${options.method || "GET"} ${options.url}`);
+  //   return options;
+  // });
+  // alite.addResponseInterceptor((data) => {
+  //   console.log(data[0]);
+  //   const firstPost = data[0];
+  //   return firstPost;
+  // });
+  // alite.addResponseInterceptor((data) => {
+  //   console.log(data.title);
+  //   return data;
+  // });
+
+  useEffect(() => {
+    // let result = alite.get();
+    // const post = alite.post({
+    //   headers: {
+    //     "Content-Type": "application/json",
+    //   },
+    //   body: { title: "foo", body: "testing the posting route", userId: 3 },
+    // });
+    const put = alite.put({
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: {
+        title: "putting into server",
+        body: "testing the put route",
+        userId: 8,
+        id: 302,
+      },
+    });
+
+    // const patch = alite.patch({
+    //   headers: {
+    //     "Content-Type": "application/json",
+    //   },
+    //   body: {
+    //     body: "testing the patching route",
+    //   },
+    // });
+    // const deletePost = alite.delete({});
+  }, []);
+
   return (
     <main className="flex items-center justify-center pt-16 pb-4">
       <div className="flex-1 flex flex-col items-center gap-16 min-h-0">
