@@ -1,31 +1,33 @@
+import AliteErrors from "./AliteErrors";
+
 interface AliteOptions {
   baseUrl?: string;
-  // reqMiddleware: any[];
-  // resMiddleware: any[];
+  timeout?: number;
+  retry?: number;
 }
 
 interface RequestObjInterface {
   url?: string;
   headers?: Record<string, string>;
   [key: string]: any;
-}
-
-interface OptionsInterface {
-  headers?: Record<string, string>;
-  [key: string]: any;
+  signal?: AbortSignal | null;
 }
 
 export default class Alite {
   // private url: string;
   private reqMiddleware: any[];
   private resMiddleware: any[];
+  private errorMiddleware: any[];
   public baseUrl: string;
   private method: Record<string, string>;
+  public timeout: number;
+  public retry: number;
 
   constructor(options: AliteOptions = {}) {
     // const url = options.url;
     this.reqMiddleware = [];
     this.resMiddleware = [];
+    this.errorMiddleware = [];
     this.baseUrl = options.baseUrl || "";
     this.method = {
       get: "GET",
@@ -34,50 +36,56 @@ export default class Alite {
       patch: "PATCH",
       delete: "DELETE",
     };
+    this.timeout = options.timeout || 0;
+    this.retry = options.retry || 0;
   }
 
   addRequestInterceptor(fn: Function) {
-    // const req = new Request(url, options);
-    // console.log(req);
-
     this.reqMiddleware.push(fn);
-    // return req;
   }
 
   addResponseInterceptor(fn: Function) {
     this.resMiddleware.push(fn);
   }
 
-  errorInterceptor(err) {
-    return err;
+  addErrorInpterceptor(fn: Function) {
+    this.errorMiddleware.push(fn);
   }
 
-  addErrorInterceptor(error) {}
+  requestTimeout(ms: number) {}
 
-  requestTimeout(num: number) {
-    setTimeout(() => {});
-  }
-
-  private async fetcher(request) {
+  private async fetcher(request, timer, attempt? = 0) {
     try {
-      console.log("about to fetch data ======");
-      console.log(request);
-      const response = await fetch(request);
+      let response = await fetch(request.clone());
+
+      if (timer) clearTimeout(timer);
+
+      if (!response.ok && attempt < this.retry) {
+        return await this.fetcher(request, timer, attempt + 1);
+      }
 
       if (!response.ok) {
-        throw new Error("error from server");
+        throw new AliteErrors(response.status, response.statusText);
       }
 
       const result = await response.json();
-      console.log(result);
       const transformedResult = await this.runRequest(
         this.resMiddleware,
         result,
       );
-      console.log(result);
       return transformedResult;
     } catch (err) {
-      console.log(err);
+      if (err.name === "AbortError") {
+        const timeoutError = new AliteErrors(408, "request Timeout");
+        await this.runRequest(this.errorMiddleware, timeoutError);
+        throw timeoutError;
+      }
+      if (err instanceof TypeError) {
+        const networkError = new AliteErrors(0, "network error");
+        await this.runRequest(this.errorMiddleware, networkError);
+        throw networkError;
+      }
+      await this.runRequest(this.errorMiddleware, err);
       throw err;
     }
   }
@@ -113,19 +121,23 @@ export default class Alite {
         },
       };
     }
+    const controller = new AbortController();
+    const timer =
+      this.timeout > 0
+        ? setTimeout(() => controller.abort(), this.timeout)
+        : null;
 
-    console.log("====== request options", requestOptions);
+    requestOptions.signal = controller.signal;
+
     const optionsResult = await this.runRequest(
       this.reqMiddleware,
       requestOptions,
     );
-    console.log("======= options post request interceptor", optionsResult);
     const request = new Request(optionsResult.url, optionsResult);
-    return request;
+    return { request, timer };
   }
 
   private async runRequest(reqStack: Function[], data) {
-    console.log("request options", data);
     const composition = reqStack.reduce(async (prevFunc, currFunc) => {
       const resolved = await prevFunc;
       return currFunc(resolved);
@@ -134,41 +146,37 @@ export default class Alite {
   }
 
   async get(requestObj: RequestObjInterface) {
-    console.log("options pre request interceptor ====", requestObj);
-    const request = await this.parseAndCreateRequest(
+    const { request, timer } = await this.parseAndCreateRequest(
       this.method.get,
       requestObj,
     );
     console.log("======= options post request interceptor", request);
-    const response = await this.fetcher(request);
+    const response = await this.fetcher(request, timer);
     return response;
   }
   async post(requestObj: RequestObjInterface) {
-    console.log("options pre request interceptor ====", requestObj);
     requestObj.method = this.method.post;
-    const request = await this.parseAndCreateRequest(
+    const { request, timer } = await this.parseAndCreateRequest(
       this.method.post,
       requestObj,
     );
 
-    const response = await this.fetcher(request);
+    const response = await this.fetcher(request, timer);
     return response;
   }
   async put(requestObj: RequestObjInterface) {
-    console.log("options pre request interceptor ====", requestObj);
     requestObj.method = this.method.put;
-    const request = await this.parseAndCreateRequest(
+    const { reuqest, timer } = await this.parseAndCreateRequest(
       this.method.put,
       requestObj,
     );
 
-    const response = await this.fetcher(request);
+    const response = await this.fetcher(request, timer);
     return response;
   }
   async patch(requestObj: RequestObjInterface) {
-    console.log("options pre request interceptor ====", requestObj);
     requestObj.method = this.method.patch;
-    const request = await this.parseAndCreateRequest(
+    const { request, timer } = await this.parseAndCreateRequest(
       this.method.patch,
       requestObj,
     );
@@ -177,14 +185,13 @@ export default class Alite {
     return response;
   }
   async delete(requestObj: RequestObjInterface) {
-    console.log("options pre request interceptor ====", requestObj);
     requestObj.method = this.method.delete;
-    const request = await this.parseAndCreateRequest(
+    const { request, timer } = await this.parseAndCreateRequest(
       this.method.delete,
       requestObj,
     );
 
-    const response = await this.fetcher(request);
+    const response = await this.fetcher(request, timer);
     return response;
   }
 }
