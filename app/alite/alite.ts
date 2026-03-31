@@ -1,17 +1,5 @@
 import AliteErrors from "./AliteErrors";
-
-interface AliteOptions {
-  baseUrl?: string;
-  timeout?: number;
-  retry?: number;
-}
-
-interface RequestObjInterface {
-  url?: string;
-  headers?: Record<string, string>;
-  [key: string]: any;
-  signal?: AbortSignal | null;
-}
+import type { AliteOptions, RequestObjInterface } from "./types.ts";
 
 export default class Alite {
   // private url: string;
@@ -39,19 +27,43 @@ export default class Alite {
     this.timeout = options.timeout || 0;
     this.retry = options.retry || 0;
   }
-
+  /**
+   * add a request interceptor function
+   * @param function - transform data
+   * @return void
+   * @example
+   * alite.addRequestInterceptor((data) => {})
+   */
   addRequestInterceptor(fn: Function) {
     this.reqMiddleware.push(fn);
   }
-
+  /**
+   * add a response interceptor function
+   * @param function - transform data
+   * @return void
+   * @example
+   * alite.addRequestInterceptor((data) => {})
+   */
   addResponseInterceptor(fn: Function) {
     this.resMiddleware.push(fn);
   }
-
-  addErrorInpterceptor(fn: Function) {
+  /**
+   * add a error interceptor function
+   * @param function - tranform data
+   * @return void
+   * @example
+   * alite.addRequestInterceptor((data) => {})
+   */
+  addErrorInterceptor(fn: Function) {
     this.errorMiddleware.push(fn);
   }
-
+  /**
+   * request timeout duration
+   * @param ms - number of milliseconds before request timeouts
+   * @return void
+   * @example
+   * alite.requestTimeout(3000) - timeout after 3 seconds
+   */
   requestTimeout(ms: number) {}
 
   private async fetcher(request, timer, attempt? = 0) {
@@ -90,6 +102,22 @@ export default class Alite {
     }
   }
 
+  private returnUrl(url: string) {
+    if (!this.baseUrl) {
+      console.log("no base url");
+      return url;
+    }
+
+    if (this.baseUrl && url) {
+      console.log("base url and url");
+      console.log(this.baseUrl + url);
+      return this.baseUrl + url;
+    }
+
+    console.log("no url");
+    return this.baseUrl;
+  }
+
   private async parseAndCreateRequest(
     method: string,
     requestObj: RequestObjInterface,
@@ -103,24 +131,25 @@ export default class Alite {
     //get cannot have a body
     if (method === "GET") {
       requestOptions = {
-        url: requestObj.url || this.baseUrl,
-        method: requestObj.method,
         ...requestObj,
+        url: this.returnUrl(requestObj.url),
+        method: requestObj.method,
         headers: {
           ...requestObj.headers,
         },
       };
     } else {
       requestOptions = {
-        url: requestObj.url || this.baseUrl,
-        method: requestObj.method,
         ...requestObj,
+        url: this.returnUrl(requestObj.url),
+        method: requestObj.method,
         body: JSON.stringify(requestObj.body),
         headers: {
           ...requestObj.headers,
         },
       };
     }
+
     const controller = new AbortController();
     const timer =
       this.timeout > 0
@@ -145,6 +174,13 @@ export default class Alite {
     return composition;
   }
 
+  /**
+   * sends a GET request
+   * @param requestObj - an object to configure the request
+   * @return parsed response data
+   * @example
+   * const posts = alite.get({url: 'example'})
+   */
   async get(requestObj: RequestObjInterface) {
     const { request, timer } = await this.parseAndCreateRequest(
       this.method.get,
@@ -154,6 +190,13 @@ export default class Alite {
     const response = await this.fetcher(request, timer);
     return response;
   }
+  /**
+   * sends a POST request
+   * @param requestObj - an object to configure the request
+   * @return parsed response data
+   * @example
+   * const posts = alite.post({url: 'example'})
+   */
   async post(requestObj: RequestObjInterface) {
     requestObj.method = this.method.post;
     const { request, timer } = await this.parseAndCreateRequest(
@@ -164,9 +207,16 @@ export default class Alite {
     const response = await this.fetcher(request, timer);
     return response;
   }
+  /**
+   * sends a PUT request
+   * @param requestObj - an object to configure the request
+   * @return parsed response data
+   * @example
+   * const posts = alite.put({url: 'example'})
+   */
   async put(requestObj: RequestObjInterface) {
     requestObj.method = this.method.put;
-    const { reuqest, timer } = await this.parseAndCreateRequest(
+    const { request, timer } = await this.parseAndCreateRequest(
       this.method.put,
       requestObj,
     );
@@ -174,6 +224,13 @@ export default class Alite {
     const response = await this.fetcher(request, timer);
     return response;
   }
+  /**
+   * sends a PATCH request
+   * @param requestObj - an object to configure the request
+   * @return parsed response data
+   * @example
+   * const posts = alite.patch({url: 'example'})
+   */
   async patch(requestObj: RequestObjInterface) {
     requestObj.method = this.method.patch;
     const { request, timer } = await this.parseAndCreateRequest(
@@ -181,9 +238,16 @@ export default class Alite {
       requestObj,
     );
 
-    const response = await this.fetcher(request);
+    const response = await this.fetcher(request, timer);
     return response;
   }
+  /**
+   * sends a DELETE request
+   * @param requestObj - an object to configure the request
+   * @return parsed response data
+   * @example
+   * const posts = alite.delete({url: 'example'})
+   */
   async delete(requestObj: RequestObjInterface) {
     requestObj.method = this.method.delete;
     const { request, timer } = await this.parseAndCreateRequest(
