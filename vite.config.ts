@@ -11,4 +11,13 @@ export default defineConfig({
     tsconfigPaths(),
     netlifyReactRouter(),
   ],
+  server: {
+    proxy: {
+      "/api": {
+        target: "https://pokeapi.co/api/v2",
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api/, ""),
+      },
+    },
+  },
 });
