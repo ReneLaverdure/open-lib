@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Alite from "~/alite/alite";
 import AliteErrors from "~/alite/AliteErrors";
 import useFetch from "~/hooks/useFetch";
@@ -9,7 +9,31 @@ import PokemonCard from "~/components/PokemonCard";
 export function Welcome() {
   const [search, setSearch] = useState("");
   const [debounceQuery, setDebounceQuery] = useState("");
+  const [offset, setOffset] = useState(0);
+  const [pokemonsData, setPokemonsData] = useState([]);
 
+  const sentinelRef = useRef(null);
+
+  // fetch on observer intersection
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const sentinel = entries[0];
+        if (sentinel.isIntersecting) {
+          setOffset((prev) => prev + 20);
+        }
+      },
+      { threshold: 0.1 },
+    );
+
+    if (sentinelRef.current) {
+      observer.observe(sentinelRef.current);
+    }
+
+    return () => observer.disconnect();
+  }, []);
+
+  //searching pokemon
   useEffect(() => {
     const timeout = setTimeout(() => {
       let searchQuery = search.replaceAll(" ", "+");
@@ -26,10 +50,16 @@ export function Welcome() {
   };
 
   const { data, isLoading, error } = useFetch({
-    url: `/api/pokemon/${debounceQuery}`,
-    refetch: [debounceQuery],
+    url: `/api/pokemon/${debounceQuery}?offset=${offset}&limit=20`,
+    refetch: [debounceQuery, offset],
   });
-  console.log(data);
+
+  useEffect(() => {
+    if (data && !isLoading) {
+      setPokemonsData((prev) => [...prev, ...data.results]);
+    }
+  }, [data, isLoading]);
+
   return (
     <main className="flex items-center justify-center pt-16 pb-4">
       <div className="flex-1 flex flex-col items-center gap-16 min-h-0">
@@ -44,13 +74,11 @@ export function Welcome() {
             value={search}
           />
 
-          {isLoading ? (
-            <h1>loading</h1>
-          ) : (
-            data.results.map((pokemon) => {
-              return <PokemonCard {...pokemon} />;
-            })
-          )}
+          {pokemonsData.map((pokemon, idx) => {
+            return <PokemonCard key={idx} {...pokemon} />;
+          })}
+          {isLoading && <h1>loading</h1>}
+          <div ref={sentinelRef}></div>
         </div>
       </div>
     </main>

@@ -1,8 +1,8 @@
 import useFetch from "~/hooks/useFetch";
-
+import { Link } from "react-router";
 export default function PokemonCard({ name, url }) {
   const { data, isLoading, error } = useFetch({ url: url });
-  console.log(data);
+  // console.log(data);
   return (
     <div>
       <h4>{name}</h4>
@@ -11,6 +11,9 @@ export default function PokemonCard({ name, url }) {
       ) : (
         <img src={data.sprites.front_default} />
       )}
+      <Link to={{ pathname: `/pokemon/${name}` }} state={{ pokemon: name }}>
+        Learn more on {name}
+      </Link>
     </div>
   );
 }

@@ -186,7 +186,7 @@ export default class Alite {
       this.method.get,
       requestObj,
     );
-    console.log("======= options post request interceptor", request);
+    // console.log("======= options post request interceptor", request);
     const response = await this.fetcher(request, timer);
     return response;
   }
